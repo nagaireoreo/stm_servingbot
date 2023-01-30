@@ -1,0 +1,8 @@
+BNO055.cpp:7:1:BNO055::BNO055()	16	static
+BNO055.cpp:12:1:BNO055::BNO055(I2C_HandleTypeDef, uint8_t)	96	static
+BNO055.cpp:16:6:void BNO055::Init(I2C_HandleTypeDef, unsigned char)	32	static,ignoring_inline_asm
+BNO055.cpp:25:7:float BNO055::GetYawRadian()	32	static
+BNO055.cpp:31:12:QUATERNION BNO055::GetQuaternion()	112	static,ignoring_inline_asm
+BNO055.cpp:74:7:EULAR BNO055::GetEular()	120	static
+BNO055.cpp:98:7:EULAR BNO055::GetAccel()	96	static,ignoring_inline_asm
+BNO055.cpp:115:7:EULAR BNO055::GetGyro()	96	static,ignoring_inline_asm
