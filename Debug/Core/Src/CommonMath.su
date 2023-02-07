@@ -14,13 +14,14 @@ stl_vector.h:285:7:std::_Vector_base<_Tp, _Alloc>::_Vector_base() [with _Tp = fl
 stl_vector.h:484:7:std::vector<_Tp, _Alloc>::vector() [with _Tp = float; _Alloc = std::allocator<float>]	16	static
 CommonMath.cpp:140:15:std::vector<float> CalcUnitVector(float, float, float)	40	static
 CommonMath.cpp:165:7:float ConvertWheelRPM2Velocity(int, float)	24	static
-CommonMath.cpp:188:6:void ConvertBodyVel2WheelVel(float, float, float, float*, float*, float*)	48	static
-CommonMath.cpp:215:6:void ConvertWheelVel2BodyVel(float, float, float, float*, float*, float*)	48	static
-CommonMath.cpp:246:6:void Rotation(float, float, float, float*, float*)	40	static
+CommonMath.cpp:190:6:void ConvertBodyVel2WheelVelManuaRate(float, float, float, float*, float*, float*, float, float)	64	static
+CommonMath.cpp:226:6:void ConvertBodyVel2WheelVel(float, float, float, float*, float*, float*)	48	static
+CommonMath.cpp:253:6:void ConvertWheelVel2BodyVel(float, float, float, float*, float*, float*)	48	static
+CommonMath.cpp:284:6:void Rotation(float, float, float, float*, float*)	40	static
 stl_vector.h:285:7:std::_Vector_base<_Tp, _Alloc>::_Vector_base() [with _Tp = std::__cxx11::basic_string<char>; _Alloc = std::allocator<std::__cxx11::basic_string<char> >]	16	static
 stl_vector.h:484:7:std::vector<_Tp, _Alloc>::vector() [with _Tp = std::__cxx11::basic_string<char>; _Alloc = std::allocator<std::__cxx11::basic_string<char> >]	16	static
-CommonMath.cpp:260:16:std::vector<std::__cxx11::basic_string<char> > SplitString(std::string, char)	56	static
-CommonMath.cpp:289:16:std::vector<std::__cxx11::basic_string<char> > SplitString2Token(std::string, char, char)	56	static
+CommonMath.cpp:298:16:std::vector<std::__cxx11::basic_string<char> > SplitString(std::string, char)	56	static
+CommonMath.cpp:327:16:std::vector<std::__cxx11::basic_string<char> > SplitString2Token(std::string, char, char)	56	static
 stl_vector.h:128:2:std::_Vector_base<_Tp, _Alloc>::_Vector_impl::_Vector_impl() [with _Tp = float; _Alloc = std::allocator<float>]	16	static
 stl_vector.h:1184:7:void std::vector<_Tp, _Alloc>::push_back(const value_type&) [with _Tp = float; _Alloc = std::allocator<float>]	16	static
 stl_vector.h:128:2:std::_Vector_base<_Tp, _Alloc>::_Vector_impl::_Vector_impl() [with _Tp = std::__cxx11::basic_string<char>; _Alloc = std::allocator<std::__cxx11::basic_string<char> >]	16	static

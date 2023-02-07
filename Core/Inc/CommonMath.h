@@ -31,6 +31,8 @@ float CalcXYZNorm(float x, float y, float z);
 vector<float> CalcUnitVector(float x, float y, float z);
 // @brief	: 車輪回転速度[rpm]から車輪速度[m/s]へ変換する(GM6020用)
 float ConvertWheelRPM2Velocity(int p_wheel_rpm, float p_wheel_diameter);
+// @brief	: 車体出力からホイール出力へ変換（運動学）し，回転と並進の出力のレートを加える
+void ConvertBodyVel2WheelVelManuaRate(float p_vx, float p_vy, float p_omega, float* p_vel_front, float* p_vel_left_back, float* p_vel_right_back, float translate_rate, float rotate_rate);
 // @brief	: 車体速度からホイール速度へ変換する（運動学）
 void ConvertBodyVel2WheelVel(float p_vx, float p_vy, float p_omega, float* p_vel_front, float* p_vel_left_back, float* p_vel_right_back);
 // @brief	: ホイール速度から車体速度へ変換する（逆運動学）

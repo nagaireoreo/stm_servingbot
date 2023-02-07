@@ -307,7 +307,8 @@ int main(void)
 
       // 速度指令値から各車輪の目標速度を計算する
       vector<float> wheel_target_velocities(MOTOR_QTY, 0);
-      ConvertBodyVel2WheelVel(speed_control_global_values[0], speed_control_global_values[1], speed_control_global_values[2], &wheel_target_velocities[0], &wheel_target_velocities[1], &wheel_target_velocities[2] );
+      ConvertBodyVel2WheelVelManuaRate(speed_control_global_values[0], speed_control_global_values[1], speed_control_global_values[2], &wheel_target_velocities[0], &wheel_target_velocities[1], &wheel_target_velocities[2], 0.8, 0.2);
+      //ConvertBodyVel2WheelVel(speed_control_global_values[0], speed_control_global_values[1], speed_control_global_values[2], &wheel_target_velocities[0], &wheel_target_velocities[1], &wheel_target_velocities[2] );
 
       // < マイコン内でフィードバック制御する場合(CANで指令値送信) >
       /*

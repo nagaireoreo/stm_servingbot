@@ -174,6 +174,44 @@ float ConvertWheelRPM2Velocity(int p_wheel_rpm, float p_wheel_diameter)
 
 
 //---------------------------------------------------------------------------------------------------------------------
+// @brief	: 車体出力からホイール出力へ変換（運動学）し，回転と並進の出力のレートを加える
+// @date	: 2021/02/11
+//
+// @param1[in]	: 車体出力x（-1 ~ 1）
+// @param2[in]	: 車体出力y（-1 ~ 1）
+// @param3[in]	: 車体出力yaw（-1 ~ 1）
+// @param4[out]: 車輪出力前
+// @param5[out]: 車輪出力左後
+// @param6[out]: 車輪出力右後
+// @param1[in]	: 並進レート（最大値）
+// @param2[in]	: 回転レート（最大値）
+// @return			: なし
+//---------------------------------------------------------------------------------------------------------------------
+void ConvertBodyVel2WheelVelManuaRate(float p_vx, float p_vy, float p_omega, float* p_vel_front, float* p_vel_left_back, float* p_vel_right_back, float translate_rate, float rotate_rate)
+{
+	// ジョイスティックが円形じゃなくて四角の場合，角度＆単位円に変換する必要ある
+
+//	float v_x 	 = Clipping(p_vx, -translate_rate, translate_rate);
+//	float v_y		 = Clipping(p_vy, -translate_rate, translate_rate);
+//	float v_yaw	 = Clipping(p_omega, -rotate_rate, rotate_rate);
+	float v_x 	 = Clipping(p_vx,         -1.0, 1.0);
+	float v_y		 = Clipping(p_vy,         -1.0, 1.0);
+	float v_yaw	 = Clipping(p_omega, -1.0, 1.0);
+	v_x *= translate_rate;
+	v_y *= translate_rate;
+	v_yaw *= rotate_rate;
+    // 車輪Frontがy軸に正
+    //*p_vel_front			= -1.0*p_vx -            0.0 *p_vy - L*p_omega;
+    //*p_vel_left_back 	=  0.5*p_vx -  0.8660254*p_vy - L*p_omega;
+    //*p_vel_right_back =  0.5*p_vx + 0.8660254*p_vy - L*p_omega;
+	// 車輪Frontがx軸に正
+    *p_vel_front          =                    0 * v_x + 1.0 * v_y  + v_yaw;
+    *p_vel_left_back   =  -0.8660254 * v_x -  0.5 * v_y  + v_yaw;
+    *p_vel_right_back =   0.8660254 * v_x -  0.5 * v_y  + v_yaw;
+}
+
+
+//---------------------------------------------------------------------------------------------------------------------
 // @brief	: 車体速度からホイール速度へ変換する（運動学）
 // @date	: 2021/02/11
 //
