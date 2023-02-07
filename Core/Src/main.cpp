@@ -166,15 +166,7 @@ int main(void)
   //msg = "Encoder Setting End\r\n";
   //HAL_UART_Transmit( &huart2, (uint8_t *)msg.c_str(), msg.size(), 0xFFFF);
 
-  // PID
-  vector<SpeedTypePIDController> pids;
 
-  SpeedTypePIDController flont_wheel_pid;
-  pids.push_back(flont_wheel_pid); // 2021/2/18ここで止まるバグ発生．放置したら直った．delayかけた方が良い？
-  SpeedTypePIDController back_left_wheel_pid;
-  pids.push_back(back_left_wheel_pid);
-  SpeedTypePIDController back_right_wheel_pid;
-  pids.push_back(back_right_wheel_pid);
 
   //msg = "PID Setting End\r\n";
   //HAL_UART_Transmit( &huart2, (uint8_t *)msg.c_str(), msg.size(), 0xFFFF);
@@ -234,13 +226,10 @@ int main(void)
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
-  //msg = "Circle Process Start!!\r\n";
-  //HAL_UART_Transmit( &huart2, (uint8_t *)msg.c_str(), msg.size(), 0xFFFF);
 
   // エンコーダの初期値を初期化する
   InitEncoder();
 
-  float pwm = 0.050;
   vector<float> accelerated_command_values;
   accelerated_command_values.push_back(0);
   accelerated_command_values.push_back(0);
@@ -256,30 +245,22 @@ int main(void)
 	{
       g_is_up_control_cycle = false;
 
-      // CAN
-      //char msgc[50];
-      //sprintf(msgc, " id=%5d %3d %3d %3d %3d %3d %3d %3d %3d\r\n", id, data[0], data[1], data[2], data[3], data[4], data[5], data[6], data[7]);
-      //HAL_UART_Transmit( &huart2, (uint8_t *)msgc, strlen(msgc) + 1, 0xFFFF);
-
-
       // < Encoder >
        encoder.Update();
-      //vector<float> wheel_velocities =encoder.GetWheelVelocities();
 
       // 自己位置を取得する
       struct_posture_t pos = encoder.GetPositions();
 
-
       // シリアルの速度指令値を取得する
       serial.Update();
 
-      //char serial_str[255] = ""; // ちゃんと初期化しないと取りこぼしっぽいくなる
       string serial_str;
 
       // 速度指令値を取得する
-      //vector<float> speed_control_local_values = serial.GetSpeedControlValues(); // ロボット座標系
       vector<float> target_speed_control_local_values = serial.GetSpeedControlValues(); // ロボット座標系
-  accelerated_command_values = CalcAcceleratedCmdValues(accelerated_command_values, target_speed_control_local_values, ACCELELATED_ADD_VEL);
+
+      // 加減速を考慮させる
+      accelerated_command_values = CalcAcceleratedCmdValues(accelerated_command_values, target_speed_control_local_values, ACCELELATED_ADD_VEL);
       vector<float> speed_control_local_values = accelerated_command_values;
 
 
@@ -287,11 +268,6 @@ int main(void)
       //sprintf(msgc, "%f %f %f \r\n", target_speed_control_local_values[0], accelerated_command_values[0], speed_control_local_values[0]);
       //HAL_UART_Transmit( &huart2, (uint8_t *)msgc, strlen(msgc) + 1, 0xFFFF);
       //HAL_UART_Transmit( &huart2, (uint8_t *)"hello", 10, 0xFFFF);
-
-      // テスト
-      //speed_control_local_values[0] = 0.0;
-      //speed_control_local_values[1] = 0.5;
-      //speed_control_local_values[2] = 0.0;
 
       // < 速度指令値をロボット座標系からマップ座標系に変換する >
       vector<float> speed_control_global_values(3, 0); // マップ座標系
@@ -310,89 +286,26 @@ int main(void)
       ConvertBodyVel2WheelVelManuaRate(speed_control_global_values[0], speed_control_global_values[1], speed_control_global_values[2], &wheel_target_velocities[0], &wheel_target_velocities[1], &wheel_target_velocities[2], 0.8, 0.2);
       //ConvertBodyVel2WheelVel(speed_control_global_values[0], speed_control_global_values[1], speed_control_global_values[2], &wheel_target_velocities[0], &wheel_target_velocities[1], &wheel_target_velocities[2] );
 
-      // < マイコン内でフィードバック制御する場合(CANで指令値送信) >
-      /*
-      vector<float> wheels_speed = encoder.GetWheelVelocities();
-      vector<float> control_u(3, 0);
-      for(int axis=0; axis<3; axis++)
-      {
-    	  // PIDの目標値をセットする
-          pids[axis].SetTarget(wheel_target_velocities[axis]);
-          // PIDの内部データを更新する
-          pids[axis].Update(wheels_speed[axis]);
-          // 制御量を取得する
-          control_u[axis] = pids[axis].GetControlValue();
-      }
-      float u1 = control_u[0];
-      float u2 = control_u[1];
-      float u3 = control_u[2];
-
-      SetDuty(control_u[0], control_u[1], control_u[2]);
-      //SetDuty(0, 0, 0);
-	  */
-
       // < MD内の閉ループ制御を使う場合(PWMで指令値送信) >
       SetPWMFront(wheel_target_velocities[0]);
       SetPWMBackLeft(wheel_target_velocities[1]);
       SetPWMBackRight(wheel_target_velocities[2]);
 
-      //SetPWMFront(1.0);
-      //SetPWMBackLeft(1.0);
-      //SetPWMBackRight(1.0);
 
-      /*
-      // キャリブレーション
-      if(HAL_GPIO_ReadPin(GPIOC, GPIO_PIN_13)==GPIO_PIN_RESET){
-			//HAL_UART_Transmit( &huart2, (uint8_t *)"ON\n", strlen("ON\n") + 1, 0xFFFF);
-			__HAL_TIM_SET_COMPARE(&htim12, TIM_CHANNEL_2, 3000); // 起動時
-			__HAL_TIM_SET_COMPARE(&htim12, TIM_CHANNEL_1, 3000); // 起動時
-			__HAL_TIM_SET_COMPARE(&htim14, TIM_CHANNEL_1, 3000); // 起動時
-		}else{
-			//HAL_UART_Transmit( &huart2, (uint8_t *)"OFF\n", strlen("OFF\n") + 1, 0xFFFF);
-			__HAL_TIM_SET_COMPARE(&htim12, TIM_CHANNEL_2, 6000);
-			__HAL_TIM_SET_COMPARE(&htim12, TIM_CHANNEL_1, 6000);
-			__HAL_TIM_SET_COMPARE(&htim14, TIM_CHANNEL_1, 6000);
-		}
-		*/
+      // GM6020キャリブレーション
+//      if(HAL_GPIO_ReadPin(GPIOC, GPIO_PIN_13)==GPIO_PIN_RESET){
+//			//HAL_UART_Transmit( &huart2, (uint8_t *)"ON\n", strlen("ON\n") + 1, 0xFFFF);
+//			__HAL_TIM_SET_COMPARE(&htim12, TIM_CHANNEL_2, 3000); // 起動時
+//			__HAL_TIM_SET_COMPARE(&htim12, TIM_CHANNEL_1, 3000); // 起動時
+//			__HAL_TIM_SET_COMPARE(&htim14, TIM_CHANNEL_1, 3000); // 起動時
+//		}else{
+//			//HAL_UART_Transmit( &huart2, (uint8_t *)"OFF\n", strlen("OFF\n") + 1, 0xFFFF);
+//			__HAL_TIM_SET_COMPARE(&htim12, TIM_CHANNEL_2, 6000);
+//			__HAL_TIM_SET_COMPARE(&htim12, TIM_CHANNEL_1, 6000);
+//			__HAL_TIM_SET_COMPARE(&htim14, TIM_CHANNEL_1, 6000);
+//		}
 
-
-
-
-
-      char msg[256] = "";
-      // サイズより大きい場合はエラーになるから注意
-	  //sprintf(msg, " ed -> %s\n ng ->%s\r\n", serial.m_received_str.c_str(),  serial.m_receiving_str.c_str());
-      //sprintf(msg, "%5.5f %5.5f %5.5f \r\n", control_u[0], control_u[1], control_u[2]);
-      //sprintf(msg, "%5.5f %5.5f %5.5f \r\n", wheel_target_velocities[0], wheel_target_velocities[1], wheel_target_velocities[2]);
-      //sprintf(msg, "%5.5f %5.5f %5.5f \r\n", wheels_speed[0], wheels_speed[1], wheels_speed[2]);
-      //sprintf(msg, "%5.5f %5.5f %5.5f \r\n", speed_control_local_values[0], speed_control_local_values[1], speed_control_local_values[2]);
-      //sprintf(msg, " %s\r\n", serial_str.c_str());
-      //sprintf(msg, "%d \r\n", k);
-      //sprintf(msg, "%d\r\n%s\r\n",uart_str.size(), uart_str.c_str());
-
-      //sprintf(msg, "%.3f  %5d\n", pwm, (int)(6000*pwm));
-
-      // PC側が受け取れる形式で自己位置を送信する
-      //sprintf(msg, "%.2f,%.2f,%.2f\n", pos.x, pos.y, pos.angle);
-      sprintf(msg, "%8.2f, %8.2f, %8.2f\n", pos.x, pos.y, Rad2Deg(pos.angle));
-
-      // rplidarが遅延するからシリアル（北陽のときは大丈夫だったのになんで遅延する？）
-      serial_count++;
-      // 処理周期が50Hzだから送信周期を5Hzにする
-      if(serial_count >= 10)
-      {
-      	  serial_count = 0;
-      	  //HAL_UART_Transmit( &huart2, (uint8_t *)msg, strlen(msg) + 1, 0xFFFF);
-      }
-      //HAL_UART_Transmit( &huart2, (uint8_t *)msg, strlen(msg) + 1, 0xFFFF);
-
-      //HAL_Delay(1000);
 	}
-
-
-	// UART受信
-	//serial.Update();
-
   }
   /* USER CODE END 3 */
 }
