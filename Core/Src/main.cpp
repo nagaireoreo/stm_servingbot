@@ -37,6 +37,8 @@
 #include "string.h"
 #include <math.h>
 
+#include "MotorController.h"
+
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -44,32 +46,23 @@
 /* USER CODE END PTD */
 
 /* Private define ------------------------------------------------------------*/
-#define ACCELELATED_ADD_VEL 0.03
+
 /* USER CODE BEGIN PD */
 // プロトタイプ宣言
 
 // @brief	: 各車輪のデューティ比を設定する
 int SetDuty(float p_duty_front, float p_duty_left, float p_duty_right);
-// @brief	: 速度指令値をPWMのコンペア値に変換する（GM6020用）
-int ConvertSpeedControlValue2PwmCompareCount(float p_speed_control_value);
+
 // @brief	: 1byteを上位8bitと下位8bitに変換する
 void ConvertByte2HighLowBit(int p_byte, int* p_low_bit, int* p_high_bit);
 // @brief	: CAN1で送信する
 int CAN1Transmit(uint32_t p_target_can_id, uint8_t p_tx_data[8]);
-// @brief : define.hで設定した値から，全方向で出せる車体の最大速度を求める
-float MaxRobotSpeed();
-// @brief	: 正面ホイール側の回転速度を設定する
-void SetPWMFront(float p_speed_command_value);
-// @brief	: 左後ホイール側の回転速度を設定する
-void SetPWMBackLeft(float p_speed_command_value);
-// @brief	: 右後ホイール側の回転速度を設定する
-void SetPWMBackRight(float p_speed_command_value);
+
+
 // @brief : CAN通信のフィルタ設定をする
 void CAN_FilterInit(void);
 
 
-// @brief	: 加速度を考慮した速度を計算する
-vector<float> CalcAcceleratedCmdValues(vector<float>, vector<float> , float);
 
 
 /* USER CODE END PD */
@@ -154,8 +147,6 @@ int main(void)
 
 
   string  msg;
-  //msg = "Initialization End\r\n";
-  //HAL_UART_Transmit( &huart2, (uint8_t *)msg.c_str(), msg.size(), 0xFFFF);
 
   // Encoder
   Encoder encoder;
@@ -163,35 +154,9 @@ int main(void)
   encoder.SetDriveWheelDiameter(0.08);
   encoder.SetGearRatio(1.0/24.9);
 
-  //msg = "Encoder Setting End\r\n";
-  //HAL_UART_Transmit( &huart2, (uint8_t *)msg.c_str(), msg.size(), 0xFFFF);
+  MotorController motor_controller;
 
-
-
-  //msg = "PID Setting End\r\n";
-  //HAL_UART_Transmit( &huart2, (uint8_t *)msg.c_str(), msg.size(), 0xFFFF);
-
-  // PWM
-  HAL_TIM_PWM_Start(&htim14, TIM_CHANNEL_1);
-  HAL_TIM_PWM_Start(&htim12, TIM_CHANNEL_2);
-  HAL_TIM_PWM_Start(&htim12, TIM_CHANNEL_1);
-  HAL_Delay(10);
-  // 安全のため初期デューティ比を0にする
-  //__HAL_TIM_SET_COMPARE(&htim14, TIM_CHANNEL_1, 0); // MD1
-  //__HAL_TIM_SET_COMPARE(&htim12, TIM_CHANNEL_2, 0); // MD2
-  //__HAL_TIM_SET_COMPARE(&htim12, TIM_CHANNEL_1, 0); // MD3
-
-  // モータのPWMが指定の範囲外になったときにエラーになるから，立ち上げ時に0を送ってエラーリセットする
-  SetPWMFront(0);
-  SetPWMBackLeft(0);
-  SetPWMBackRight(0);
-
-  //__HAL_TIM_SET_COMPARE(&htim12, TIM_CHANNEL_2, (int)(60000*0.05));
-  //__HAL_TIM_SET_COMPARE(&htim12, TIM_CHANNEL_2, (int)(60000*0.075));
   HAL_Delay(100);
-
-  //msg = "PWM Setting End\r\n";
-  //HAL_UART_Transmit( &huart2, (uint8_t *)msg.c_str(), msg.size(), 0xFFFF);
 
   // シリアル通信
   // DWA受信
@@ -204,12 +169,13 @@ int main(void)
   // CANのフィルタ設定
   CAN_FilterInit();
   HAL_CAN_Start(&hcan1);
+
   // 割り込み有効
   if (HAL_CAN_ActivateNotification(&hcan1, CAN_IT_RX_FIFO0_MSG_PENDING) != HAL_OK)
   {
-	  msg = "CAN Setting Error ....... \r\n";
-	  HAL_UART_Transmit( &huart2, (uint8_t *)msg.c_str(), msg.size(), 0xFFFF);
-      Error_Handler();
+    msg = "CAN Setting Error ....... \r\n";
+    HAL_UART_Transmit( &huart2, (uint8_t *)msg.c_str(), msg.size(), 0xFFFF);
+    Error_Handler();
   }
   //msg = "CAN Setting End\r\n";
   //HAL_UART_Transmit( &huart2, (uint8_t *)msg.c_str(), msg.size(), 0xFFFF);
@@ -230,19 +196,14 @@ int main(void)
   // エンコーダの初期値を初期化する
   InitEncoder();
 
-  vector<float> accelerated_command_values;
-  accelerated_command_values.push_back(0);
-  accelerated_command_values.push_back(0);
-  accelerated_command_values.push_back(0);
-
   while (1)
   {
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
 	 // 10ms circle process
-	if(g_is_up_control_cycle == true)
-	{
+    if(g_is_up_control_cycle == true)
+    {
       g_is_up_control_cycle = false;
 
       // < Encoder >
@@ -259,9 +220,6 @@ int main(void)
       // 速度指令値を取得する
       vector<float> target_speed_control_local_values = serial.GetSpeedControlValues(); // ロボット座標系
 
-      // 加減速を考慮させる
-      accelerated_command_values = CalcAcceleratedCmdValues(accelerated_command_values, target_speed_control_local_values, ACCELELATED_ADD_VEL);
-      vector<float> speed_control_local_values = accelerated_command_values;
 
 
       //char msgc[50];
@@ -280,32 +238,8 @@ int main(void)
       speed_control_global_values[0] = speed_control_local_values[0];
       speed_control_global_values[1] = speed_control_local_values[1];
       speed_control_global_values[2] = speed_control_local_values[2];
+    }
 
-      // 速度指令値から各車輪の目標速度を計算する
-      vector<float> wheel_target_velocities(MOTOR_QTY, 0);
-      ConvertBodyVel2WheelVelManuaRate(speed_control_global_values[0], speed_control_global_values[1], speed_control_global_values[2], &wheel_target_velocities[0], &wheel_target_velocities[1], &wheel_target_velocities[2], 0.8, 0.2);
-      //ConvertBodyVel2WheelVel(speed_control_global_values[0], speed_control_global_values[1], speed_control_global_values[2], &wheel_target_velocities[0], &wheel_target_velocities[1], &wheel_target_velocities[2] );
-
-      // < MD内の閉ループ制御を使う場合(PWMで指令値送信) >
-      SetPWMFront(wheel_target_velocities[0]);
-      SetPWMBackLeft(wheel_target_velocities[1]);
-      SetPWMBackRight(wheel_target_velocities[2]);
-
-
-      // GM6020キャリブレーション
-//      if(HAL_GPIO_ReadPin(GPIOC, GPIO_PIN_13)==GPIO_PIN_RESET){
-//			//HAL_UART_Transmit( &huart2, (uint8_t *)"ON\n", strlen("ON\n") + 1, 0xFFFF);
-//			__HAL_TIM_SET_COMPARE(&htim12, TIM_CHANNEL_2, 3000); // 起動時
-//			__HAL_TIM_SET_COMPARE(&htim12, TIM_CHANNEL_1, 3000); // 起動時
-//			__HAL_TIM_SET_COMPARE(&htim14, TIM_CHANNEL_1, 3000); // 起動時
-//		}else{
-//			//HAL_UART_Transmit( &huart2, (uint8_t *)"OFF\n", strlen("OFF\n") + 1, 0xFFFF);
-//			__HAL_TIM_SET_COMPARE(&htim12, TIM_CHANNEL_2, 6000);
-//			__HAL_TIM_SET_COMPARE(&htim12, TIM_CHANNEL_1, 6000);
-//			__HAL_TIM_SET_COMPARE(&htim14, TIM_CHANNEL_1, 6000);
-//		}
-
-	}
   }
   /* USER CODE END 3 */
 }
@@ -526,163 +460,6 @@ int CAN1Transmit(uint32_t p_target_can_id, uint8_t p_tx_data[8])
 
 }
 
-
-//---------------------------------------------------------------------------------------------------------------------
-// @brief	: 速度指令値をPWMのコンペア値に変換する（GM6020用）
-// @date	: 2021/04/29
-//
-// @param1[in]	: 速度指令値(-1.0 ~ 1.0)
-// @return			: PWMのコンペア値
-//---------------------------------------------------------------------------------------------------------------------
-int ConvertSpeedControlValue2PwmCompareCount(float p_speed_control_value)
-{
-	// GM6020の正転逆転のPWMのコンペア値の境界値（未使用のものは記録用）
-	//int ccw_min_compare_value  = PWM_TIMER_COUNTER_PERIOD * 0.054; // 1080us
-	int ccw_max_compare_value = PWM_TIMER_COUNTER_PERIOD * 0.074; // 1480us
-	int stop_compare_value        = PWM_TIMER_COUNTER_PERIOD * 0.075; // 1500us
-	int cw_min_compare_value   = PWM_TIMER_COUNTER_PERIOD * 0.076; // 1520us
-	//int cw_max_compare_value  = PWM_TIMER_COUNTER_PERIOD * 0.096; // 1920us
-
-	// 速度指令値の絶対値がこの閾値以下なら，速度指令値をゼロとして扱う(float対策)
-	// 0.01くらいで正転に個体差が出てくる
-	float zero_threshold = 0.0001;
-	float range_min2max_compare_value = PWM_TIMER_COUNTER_PERIOD * 0.020;
-
-	int pwm_compare_count = 0;
-
-	// 停止
-	if(abs(p_speed_control_value) < zero_threshold)
-	{
-		pwm_compare_count = stop_compare_value;
-	}
-	// 正転
-	else if(p_speed_control_value >= zero_threshold)
-	{
-		pwm_compare_count = cw_min_compare_value + int(range_min2max_compare_value * p_speed_control_value);
-	}
-	// 逆転
-	else if(p_speed_control_value <= -zero_threshold)
-	{
-		pwm_compare_count = ccw_max_compare_value + int(range_min2max_compare_value * p_speed_control_value);
-	}
-	// 例外なし
-
-	//char msgc[20] = "";
-	//sprintf(msgc, " in %d   \r\n", pwm_compare_count);
-	//HAL_UART_Transmit( &huart2, (uint8_t *)msgc, strlen(msgc) + 1, 0xFFFF);
-
-	return pwm_compare_count;
-}
-
-//---------------------------------------------------------------------------------------------------------------------
-// @brief : define.hで設定した値から，全方向で出せる車体の最大速度を求める
-// @date	: 2021/04/29
-//
-// @return			: 車体の最大速度
-//---------------------------------------------------------------------------------------------------------------------
-float MaxRobotSpeed()
-{
-	// 車輪の最大速度[m/s]
-	float max_wheel_vel = WHEEL_DIAMETER * M_PI * MAX_MOTOR_RPM / 60.0;
-	// 車体の最大速度 [m/s]
-	// 車輪の最大速度の√3/2倍から算出する(角度によって最小になる，車体の最大速度)
-	float max_robot_vel = max_wheel_vel * (1.732051 / 2.0); // 1.732051 ≒ √3
-
-	return max_robot_vel;
-}
-
-
-//---------------------------------------------------------------------------------------------------------------------
-// @brief	: 正面ホイール側の回転速度を設定する
-// @date	: 2021/04/29
-//
-// @param1[in]	: 速度指令値(-1.0 ~ 1.0)
-// @return			: なし
-//---------------------------------------------------------------------------------------------------------------------
-void SetPWMFront(float p_speed_command_value )
-{
-	// 回転方向が逆だから正転逆転を入れ替える
-	//p_speed_command_value *= -1.0;
-	// -1.0 ~ 1.0の範囲にクリッピングする
-	p_speed_command_value = Clipping(p_speed_command_value, -1.0, 1.0);
-	// 速度指令値からPWMのコンペアマッチのカウント値に変換する
-	int p_pwm_compare_match_value = ConvertSpeedControlValue2PwmCompareCount(p_speed_command_value);
-	// PWMのコンペアマッチのカウント値を設定する
-	__HAL_TIM_SET_COMPARE(&htim12, TIM_CHANNEL_2, p_pwm_compare_match_value);
-}
-
-//---------------------------------------------------------------------------------------------------------------------
-// @brief	: 左後ホイール側の回転速度を設定する
-// @date	: 2021/04/29
-//
-// @param1[in]	: 速度指令値(-1.0 ~ 1.0)
-// @return			: なし
-//---------------------------------------------------------------------------------------------------------------------
-void SetPWMBackLeft(float p_speed_command_value)
-{
-	// 回転方向が逆だから正転逆転を入れ替える
-	//p_speed_command_value *= -1.0;
-	// -1.0 ~ 1.0の範囲にクリッピングする
-	p_speed_command_value = Clipping(p_speed_command_value, -1.0, 1.0);
-	// 速度指令値からPWMのコンペアマッチのカウント値に変換する
-	int p_pwm_compare_match_value = ConvertSpeedControlValue2PwmCompareCount(p_speed_command_value);
-	// PWMのコンペアマッチのカウント値を設定する
-	__HAL_TIM_SET_COMPARE(&htim12, TIM_CHANNEL_1, p_pwm_compare_match_value);
-}
-
-//---------------------------------------------------------------------------------------------------------------------
-// @brief	: 右後ホイール側の回転速度を設定する
-// @date	: 2021/04/29
-//
-// @param1[in]	: 速度指令値(-1.0 ~ 1.0)
-// @return			: なし
-//---------------------------------------------------------------------------------------------------------------------
-void SetPWMBackRight(float p_speed_command_value)
-{
-	// 回転方向が逆だから正転逆転を入れ替える
-	//p_speed_command_value *= -1.0;
-	// -1.0 ~ 1.0の範囲にクリッピングする
-	p_speed_command_value = Clipping(p_speed_command_value, -1.0, 1.0);
-	// 速度指令値からPWMのコンペアマッチのカウント値に変換する
-	int p_pwm_compare_match_value = ConvertSpeedControlValue2PwmCompareCount(p_speed_command_value);
-	// PWMのコンペアマッチのカウント値を設定する
-	__HAL_TIM_SET_COMPARE(&htim14, TIM_CHANNEL_1, p_pwm_compare_match_value);
-}
-
-
-
-//---------------------------------------------------------------------------------------------------------------------
-// @brief	: 加速度を考慮した速度を計算する
-// @date	: 2023/01/06
-//
-// @param1[in]	: 現在速度
-// @param2[in]	: 目標速度
-// @param3[in]	: 1ループで増加減する速度
-// @return			: 加速度を考慮した速度
-//---------------------------------------------------------------------------------------------------------------------
-vector<float> CalcAcceleratedCmdValues(vector<float>p_accelerated_vel, vector<float> p_target_vel, float p_add_vel)
-{
-
-
-
-
-    if(p_accelerated_vel.size() != p_target_vel.size())
-    {
-    	HAL_UART_Transmit( &huart2, (uint8_t *)"p_accelerated_vel.size() != p_target_vel.size()", 100 , 0xFFFF);
-        return p_accelerated_vel;
-    }
-
-    for(int i=0; i<p_target_vel.size(); i++)
-    {
-        float diff = p_target_vel[i] - p_accelerated_vel[i];
-        float limited_add_vel = Clipping(diff, -p_add_vel, p_add_vel);
-
-        p_accelerated_vel[i] += limited_add_vel;
-    }
-
-
-    return p_accelerated_vel;
-}
 
 /* USER CODE END 4 */
 

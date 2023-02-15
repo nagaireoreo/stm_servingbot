@@ -1,6 +1,7 @@
 "Core/Src/BNO055.o"
 "Core/Src/CommonMath.o"
 "Core/Src/Encoder.o"
+"Core/Src/MotorController.o"
 "Core/Src/PID.o"
 "Core/Src/Serial.o"
 "Core/Src/can.o"
